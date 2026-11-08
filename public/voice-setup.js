@@ -4,7 +4,9 @@ import { esc } from './util.js';
 // rather than building or installing while the human waits to speak: Vosk's model for the labels
 // (voice-consent.js asks before fetching it), Apple's speech helper built with swiftc, and macOS's
 // own English speech model for the boxes (server/speech.js `setup`). A helper that cannot run is no
-// reason to hold the labels back: its boxes fall back to Dictation (voice-box.js).
+// reason to hold the labels back: its boxes fall back to Dictation (voice-box.js). Off a Mac (Linux, or
+// WSL with a Windows browser) the server says `not-mac` at once: both Apple steps are skipped, and
+// the boxes use Vosk's model in the browser (voice-local.js).
 export const STEPS = [
   { id: 'vosk', label: 'Vosk’s English model, which hears the words on screen' },
   { id: 'helper', label: 'Apple’s speech helper, built on this Mac with swiftc' },
@@ -32,10 +34,16 @@ export function createSetupSteps({ onChange = () => {} } = {}) {
   };
 }
 
+// Off a Mac neither Apple step can run: both are skipped (not failed), so the labels go ahead.
+export function skipApple(steps) {
+  steps.set('helper', 'skipped', { note: 'Apple’s, so only on a Mac: this board does not run on one' });
+  steps.set('speech', 'skipped', { note: 'text boxes use Vosk’s model in the browser instead' });
+}
+
 // The helper's half, over the control socket (`{type:'speech', op:'setup'}`): resolves once it is
 // built and macOS's model installed, or with the error that stopped it; never rejects, since the labels
 // go ahead either way.
-const HELPER_REASONS = new Set(['not-mac', 'old-macos', 'no-swiftc', 'build-failed']);
+const HELPER_REASONS = new Set(['old-macos', 'no-swiftc', 'build-failed']);
 const pct = (f) => `${Math.round(f * 100)}%`;
 export function createHelperSetup({ send, steps, tag = Math.random().toString(36).slice(2, 8) }) {
   let seq = 0, live = null;
@@ -56,7 +64,11 @@ export function createHelperSetup({ send, steps, tag = Math.random().toString(36
       else if (kind === 'built') { steps.set('helper', 'done'); steps.set('speech', 'active', { note: 'checking' }); }
       else if (kind === 'installing') steps.set('speech', 'active', { note: msg.fraction == null ? 'downloading' : `downloading, ${pct(msg.fraction)}`, fraction: msg.fraction });
       else if (kind === 'installed') { steps.set('speech', 'done'); live.resolve(null); live = null; }
-      else if (kind === 'error') {
+      else if (kind === 'error' && msg.reason === 'not-mac') {
+        skipApple(steps);
+        live.resolve({ reason: msg.reason, error: msg.error });
+        live = null;
+      } else if (kind === 'error') {
         const helper = msg.step === 'helper' || HELPER_REASONS.has(msg.reason);
         if (helper) { steps.set('helper', 'failed', { note: msg.error }); steps.set('speech', 'skipped', { note: 'text boxes use macOS Dictation instead' }); } else steps.set('speech', 'failed', { note: msg.error });
         live.resolve({ reason: msg.reason, error: msg.error });

@@ -5,10 +5,11 @@
 // (Settings › Shortcuts, "lamp" unless changed) stops, and what is said after that word presses as the
 // labels would have heard it. Where the helper cannot run (not macOS 26, no swiftc, a failed build,
 // SpeechTranscriber unavailable) the box falls back to the Mac's own Dictation, started by a menu
-// click (dictation.js), and the status line says why. A box a redraw replaced is found again by its
-// label, so words keep landing. Typing, or moving the cursor there by key or pointer, stops listening
-// for good while the box keeps focus: each partial rewrites from where recording began, so it would
-// overwrite the edit.
+// click (dictation.js), and the status line says why. Off a Mac (the server says `not-mac`) there is
+// neither, so the box records with Vosk's model in the browser instead (voice-local.js, `local`). A box
+// a redraw replaced is found again by its label, so words keep landing. Typing, or moving the cursor
+// there by key or pointer, stops listening for good while the box keeps focus: each partial rewrites
+// from where recording began, so it would overwrite the edit.
 
 export const DEFAULT_ESCAPE_WORD = 'lamp';
 // The setting, the whole phrase; snapshots from before it, or a blank one, read the default.
@@ -69,7 +70,7 @@ export const EDITED_NOTE = 'Stopped listening — you’re editing. Leave the bo
 // that firm up only once the box was left (a later partial, the final); `onChange()` hears every
 // change of state, for the
 // top bar's mic; `log` each recording's latency.
-export function createVoiceBox({ doc = document, speech, escapeWord = () => DEFAULT_ESCAPE_WORD, dictation, onExit = (el) => el?.blur(), onAfter = () => {}, onChange = () => {}, log = (...a) => console.info('[voice]', ...a), now = () => performance.now(), setTimer = setTimeout, clearTimer = clearTimeout }) {
+export function createVoiceBox({ doc = document, speech, local = null, escapeWord = () => DEFAULT_ESCAPE_WORD, dictation, onExit = (el) => el?.blur(), onAfter = () => {}, onChange = () => {}, log = (...a) => console.info('[voice]', ...a), now = () => performance.now(), setTimer = setTimeout, clearTimer = clearTimeout }) {
   const win = doc.defaultView ?? globalThis;
   const hud = doc.createElement('div');
   hud.className = 'voice-hud';
@@ -188,10 +189,13 @@ export function createVoiceBox({ doc = document, speech, escapeWord = () => DEFA
     if (active !== a) return;
     if (e.kind === 'building') say('Building Apple’s speech helper (first use only)…');
     else if (e.kind === 'installing') say('macOS is checking its English speech model…');
-    else if (e.kind === 'ready') { set(a, 'listening'); say(`Listening on this Mac — Enter sends, Esc or “${wordOr(escapeWord())}” leaves the box`, 'live'); }
+    else if (e.kind === 'ready') { set(a, 'listening'); say(`Listening ${a.local ? 'in this browser, with Vosk' : 'on this Mac'} — Enter sends, Esc or “${wordOr(escapeWord())}” leaves the box`, 'live'); }
     else if (e.kind === 'partial') heard(a, e.text);
     else if (e.kind === 'final' && !a.stopping) { heard(a, e.text); finish(a); }
     else if (e.kind === 'error' && !a.stopping) {
+      // Not a Mac: no helper and no Dictation, so the box records in the browser from now on.
+      if (e.reason === 'not-mac' && local && !a.local) { helperDown = e; say('Starting…'); record(a, local); return; }
+      if (a.local) { set(a, 'failed'); finish(a, `Vosk could not listen here: ${e.error}`); return; }
       log(`speech helper unavailable (${e.reason}): ${e.error}`);
       if (LASTING.has(e.reason)) helperDown = e;
       startDictation(a, e);
@@ -217,10 +221,17 @@ export function createVoiceBox({ doc = document, speech, escapeWord = () => DEFA
     paused = null;
     const a = active = { el, key: keyOf(el), anchor: 'value' in el ? anchorOf(el) : null, state: 'starting', firstAt: null, startAt: now(), stopping: false, exited: false };
     onChange();
-    // Only a field with a value takes spliced words; anything else is Dictation's to type into.
-    if (helperDown || !a.anchor) return startDictation(a, helperDown || { error: 'this box takes only typed text' });
+    const inBrowser = !!local && helperDown?.reason === 'not-mac';
+    // Only a field with a value takes spliced words; anything else is Dictation's to type into, on a Mac.
+    if (!a.anchor && inBrowser) { set(a, 'failed'); return finish(a, 'Voice types only into a plain text box here: macOS Dictation, which fills the others, is Mac-only'); }
+    if (!inBrowser && (helperDown || !a.anchor)) return startDictation(a, helperDown || { error: 'this box takes only typed text' });
     say('Starting…');
-    a.rec = speech.record({ onEvent: (e) => event(a, e) });
+    return record(a, inBrowser ? local : speech);
+  }
+  // A recording through the server's helper (`speech`) or in the browser (`local`), one at a time.
+  async function record(a, via) {
+    a.local = via === local;
+    a.rec = via.record({ onEvent: (e) => event(a, e) });
     try { await a.rec.open(); } catch (err) {
       if (active === a && !a.edited) { set(a, 'failed'); finish(a, err?.name === 'NotAllowedError' ? 'The microphone was refused' : String(err?.message || err)); }
     }
@@ -289,7 +300,7 @@ export function createVoiceBox({ doc = document, speech, escapeWord = () => DEFA
     start,
     stop,
     // The box recording now, by whichever way: speech (starting, listening) or dictation.
-    get active() { return active && { el: locate(), state: active.state }; },
+    get active() { return active && { el: locate(), state: active.state, local: !!active.local }; },
     // The focused box an edit stopped listening to.
     get paused() { return active || !paused ? null : { el: locate(paused) }; },
     // `el` is a redraw's replacement for the box recording (or paused): it carries on there.
@@ -300,7 +311,8 @@ export function createVoiceBox({ doc = document, speech, escapeWord = () => DEFA
       if (!hud.hidden) rehost();
     },
     get helperDown() { return helperDown; },
-    // Voice's setup found the helper cannot run (voice-setup.js): boxes go straight to Dictation.
+    // Voice's setup found the helper cannot run (voice-setup.js): boxes go straight to Dictation, or
+    // off a Mac to Vosk in the browser.
     helperFailed(e) { if (LASTING.has(e?.reason)) helperDown = e; },
     // The last recording's time to first words and to final text after its stop.
     get last() { return last; },

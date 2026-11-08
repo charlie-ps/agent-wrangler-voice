@@ -401,3 +401,63 @@ test('under Dictation the escape word leaves wherever it stands in what it typed
   assert.equal(el.value, 'Fix the retry lamp button', 'nothing more is kept once left');
   assert.deepEqual(f.said, [['exit', 'start'], ['after', 'bottom']]);
 });
+
+// Off a Mac: no helper and no Dictation, so a box records with Vosk in the browser (voice-local.js).
+function offMac(t) {
+  const local = [];
+  const f = boxes(t, { local: { record: (opts) => { const r = { opts, cancelled: 0, async open() {}, stop: () => new Promise((resolve) => { r.finish = resolve; }), cancel() { r.cancelled++; } }; local.push(r); return r; } } });
+  return Object.assign(f, { local });
+}
+
+test('off a Mac the first box, told not-mac by the server, records in the browser instead, never Dictation, and later boxes go straight there', async (t) => {
+  const f = offMac(t);
+  const el = f.box('Add idea');
+  el.focus(); el.setSelectionRange(el.value.length, el.value.length);
+  f.v.start(el);
+  await flush();
+  f.recs[0].opts.onEvent({ kind: 'error', reason: 'not-mac', error: 'Apple’s speech helper only runs on a Mac' });
+  await flush();
+  assert.equal(f.local.length, 1, 'the same box, now in the browser');
+  assert.deepEqual(f.dict, [], 'Dictation is Mac-only');
+  f.local[0].opts.onEvent({ kind: 'ready', where: 'browser' });
+  assert.deepEqual(f.v.active, { el, state: 'listening', local: true });
+  assert.match(f.document.querySelector('.voice-hud').textContent, /Listening in this browser, with Vosk.*“lamp” leaves the box/);
+  f.local[0].opts.onEvent({ kind: 'partial', text: 'add a retry' });
+  assert.equal(el.value, 'Fix the button add a retry');
+  f.local[0].opts.onEvent({ kind: 'partial', text: 'add a retry limit lamp settings' });
+  assert.equal(el.value, 'Fix the button add a retry limit', 'the escape word works the same on Vosk’s lowercase text');
+  assert.deepEqual(f.said, [['exit', 'settings']], 'and what followed it presses');
+  f.v.stop();
+  f.local[0].finish({ kind: 'final', text: 'add a retry limit lamp settings' });
+  await flush();
+  f.v.start(f.box('Reply'));
+  await flush();
+  assert.deepEqual([f.recs.length, f.local.length, f.dict], [1, 2, []], 'no second ask of the server');
+});
+
+test('a setup that found no Mac sends the first box to the browser; a box Vosk cannot hear says why and starts nothing else', async (t) => {
+  const f = offMac(t);
+  f.v.helperFailed({ reason: 'not-mac', error: 'Apple’s speech helper only runs on a Mac' });
+  f.v.start(f.box('Add idea'));
+  await flush();
+  assert.deepEqual([f.recs.length, f.local.length], [0, 1]);
+  f.local[0].opts.onEvent({ kind: 'error', reason: 'no-model', error: 'The voice model is not there (HTTP 404)' });
+  assert.equal(f.v.active, null);
+  assert.deepEqual(f.dict, []);
+  assert.match(f.document.querySelector('.voice-hud').textContent, /Vosk could not listen here: The voice model is not there/);
+  f.document.body.insertAdjacentHTML('beforeend', '<div contenteditable="true" aria-label="Notes"></div>');
+  f.v.start(f.document.querySelector('[aria-label="Notes"]'));
+  await flush();
+  assert.deepEqual([f.local.length, f.dict], [1, []], 'a rich box takes only Dictation’s typing, which is Mac-only');
+  assert.match(f.document.querySelector('.voice-hud').textContent, /plain text box/);
+});
+
+test('on a Mac nothing changes: with no local recorder offered a not-mac answer still falls to Dictation', async (t) => {
+  const f = boxes(t);
+  f.v.start(f.box('Add idea'));
+  await flush();
+  f.recs[0].opts.onEvent({ kind: 'error', reason: 'no-swiftc', error: 'swiftc is not installed' });
+  await flush();
+  assert.deepEqual(f.dict, [['start', 'Add idea']]);
+  assert.equal(f.v.active.local, false);
+});

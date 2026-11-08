@@ -66,3 +66,19 @@ test('the warning names the size, the host and the pin, and only Download says y
   ask.close();
   assert.equal(await dropped, false, 'Voice switched off meanwhile');
 });
+
+test('on a Mac the warning names Apple’s helper and speech model; off one it says the boxes use this model in the browser', async (t) => {
+  const window = new Window();
+  t.after(() => window.happyDOM.close());
+  let mac = true;
+  const ask = createModelAsk({ doc: window.document, mac: () => mac });
+  ask.open();
+  const also = () => window.document.querySelector('.job-voice-ask-also').textContent;
+  assert.match(also(), /Apple’s speech helper.*swiftc.*macOS’s own English speech model/);
+  ask.close();
+  mac = false;
+  ask.open();
+  assert.match(also(), /this same model, in the browser.*not on a Mac/);
+  assert.doesNotMatch(also(), /swiftc/);
+  ask.close();
+});
