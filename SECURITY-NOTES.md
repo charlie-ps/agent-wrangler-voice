@@ -51,11 +51,17 @@ vendored bundle, the model pin (`public/voice-model.js`) or a `voice:` control h
   written into a box as a field's value and status lines are `textContent`: nothing a transcript says
   becomes markup.
 - **Links a heard word opens** (`voice:open-url`): the recognizer's callback has no user activation, so
-  the server runs macOS `open <url>` instead. It takes only a string that parses as an `http:` or
-  `https:` URL (at most 8192 characters) and passes its re-serialised `href` as the one argument to
-  `execFile('open', …)`, no shell; anything else (`file:`, `javascript:`, an app path, a custom scheme,
-  a leading `-`) is refused without running anything. A control-socket client can therefore only make
-  the Mac's default browser load a web page, less than it can already do.
+  the server opens it instead. It takes only a string that parses as an `http:` or `https:` URL (at
+  most 8192 characters) and passes its re-serialised `href` as the one argument, no shell, to a fixed
+  command: `execFile('open', …)` on a Mac; off one `spawn` (detached, stdio ignored) of `xdg-open` on
+  Linux, or under WSL `wslview`, else `explorer.exe`. Anything else (`file:`, `javascript:`, an app
+  path, a custom scheme, a leading `-`) is refused without running anything; the href always starts
+  `http`, so none of them reads it as a flag. A control-socket client can therefore only make the
+  default browser (Windows' under WSL) load a web page, less than it can already do. The command is
+  found on the server's `PATH`, like the agents it launches.
+- **Text boxes off a Mac** (`public/voice-local.js`): the same pinned, hashed Vosk model in the
+  browser, with a recognizer that has no word list. Audio stays in the browser; nothing new is
+  fetched or sent to the server.
 - **Control types**: Voice's handlers are `voice:model`, `voice:speech`, `voice:dictation` and
   `voice:open-url`, never a type Wrangler²'s extension registers, so both can be installed on one
   board (`server/voice-handlers.test.js`).
@@ -68,4 +74,5 @@ is therefore as trusted as the board itself. Voice adds: a vendored recognizer (
 fetched once by the server from a pinned URL and hash, only on the human's explicit Download,
 microphone access, a speech helper the server builds with Apple's swiftc and feeds the microphone's PCM
 for a focused text box (text comes back; audio stays on the Mac), the Dictation fallback's constant
-menu click, and `open` for http(s) links a heard word presses.
+menu click, and `open` (`xdg-open`, `wslview` or `explorer.exe` off a Mac) for http(s) links a heard
+word presses. Off a Mac there is no helper and no Dictation: text boxes use Vosk in the browser.

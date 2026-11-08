@@ -19,7 +19,9 @@ export async function prepareModel({ check, ask, download }) {
 
 // The warning, on <body> like the merge ask so a redraw never wipes it and it stacks over Settings.
 // `open()` resolves true for Download and false for anything else; `close()` is a Cancel.
-export function createModelAsk({ theme = () => {}, doc = globalThis.document, model = VOICE_MODEL } = {}) {
+// `mac()` says the board runs on a Mac, where Voice also sets up Apple's speech for text boxes;
+// elsewhere the boxes use this same model in the browser.
+export function createModelAsk({ theme = () => {}, doc = globalThis.document, model = VOICE_MODEL, mac = () => true } = {}) {
   let dialog = null, answer = null, asked = null;
   const settle = (yes) => { const a = answer; answer = asked = null; a?.(yes); if (dialog?.open) dialog.close(); };
   function open() {
@@ -35,7 +37,7 @@ export function createModelAsk({ theme = () => {}, doc = globalThis.document, mo
     dialog.innerHTML = `<h2 id="job-voice-ask-title">Download Voice’s speech model?</h2>
       <p class="job-voice-ask-why">Voice hears the words on screen with Vosk’s small English model, which this computer does not have yet. It is <b>${esc(modelSize(model))}</b>, fetched once from <b>${esc(modelHost(model))}</b> by the wrangler’s own server and kept only if its SHA-256 matches the one pinned in its source; the board checks it again before using it. After that, what you say is heard on this computer only.</p>
       <p class="job-voice-ask-from">${esc(model.from)}</p>
-      <p class="job-voice-ask-also">Turning Voice on also sets up, before any label is drawn: Apple’s speech helper, built once on this computer from the wrangler’s source with swiftc, and macOS’s own English speech model, which macOS may fetch, so text boxes listen as soon as you click into them.</p>
+      <p class="job-voice-ask-also">${mac() ? 'Turning Voice on also sets up, before any label is drawn: Apple’s speech helper, built once on this computer from the wrangler’s source with swiftc, and macOS’s own English speech model, which macOS may fetch, so text boxes listen as soon as you click into them.' : 'Text boxes use this same model, in the browser, to hear what you say into them: the wrangler is not on a Mac, so Apple’s speech and Dictation are not set up.'}</p>
       <div class="job-actions"><button type="button" class="primary" data-voice-ask="download">Download ${esc(modelSize(model))}</button><button type="button" data-voice-ask="cancel">Cancel</button></div>`;
     dialog.querySelectorAll('[data-voice-ask]').forEach((b) => b.onclick = () => settle(b.dataset.voiceAsk === 'download'));
     asked = new Promise((resolve) => { answer = resolve; });

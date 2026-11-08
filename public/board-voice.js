@@ -15,9 +15,10 @@
 //   to the pin (server/voice-model.js), and hashed again here before Vosk reads it.
 // - Turning Voice on also sets up Apple's speech helper and macOS's English model
 //   (voice-setup.js, server/speech.js), with progress round the rail's mic and in a panel beside it,
-//   and no label is drawn until that is done.
+//   and no label is drawn until that is done. Off a Mac both Apple steps are skipped.
 // - A focused text box records into the box at the cursor through the helper (voice-box.js,
-//   voice-speech.js), Dictation where it cannot run (dictation.js, server/dictation.js); the escape
+//   voice-speech.js), Dictation where it cannot run (dictation.js, server/dictation.js), and off a Mac
+//   (Linux, WSL) the same Vosk model in the browser with no word list (voice-local.js); the escape
 //   word (Settings › Shortcuts › Voice escape word) leaves the box and hands what follows to the labels.
 // - A link a heard word presses opens through the server (voice-open.js), since the recognizer's
 //   callback carries no user activation for the popup blocker.
@@ -26,13 +27,14 @@
 // Never the browser's Web Speech API, which sends audio away.
 import { createKeys, clickables, reach, bareKey, typing, dictatable, hintRank, COMMANDS, scrollStep } from './job-keys.js';
 import { labelsOf } from './label-modes.js';
-import { createVoice } from './job-voice.js';
+import { createVoice, loadModel, MODEL_URL } from './job-voice.js';
 import { createModelAsk, prepareModel, modelSize, DECLINED } from './voice-consent.js';
 import { createVoiceBox, escapeWordOf, fmt, sameBox } from './voice-box.js';
 import { createMic } from './voice-mic.js';
 import { createSpeech } from './voice-speech.js';
+import { createLocalSpeech } from './voice-local.js';
 import { createDictation } from './dictation.js';
-import { createSetupSteps, createHelperSetup, setupHtml } from './voice-setup.js';
+import { createSetupSteps, createHelperSetup, setupHtml, skipApple } from './voice-setup.js';
 import { createHeardOpener } from './voice-open.js';
 
 // Wrangler²'s control messages, as this board's server names them (server/voice-handlers.js).
@@ -114,7 +116,9 @@ export function initBoardVoice({ send, getSetting, setSetting, toast = () => {},
     win.open = (url) => { opener.open(String(url)); return null; };
     try { return press(); } finally { win.open = own; }
   });
-  const modelAsk = createModelAsk({ doc });
+  // The server's platform, from its first model check: off a Mac the warning names no Apple step.
+  let platform = null;
+  const modelAsk = createModelAsk({ doc, mac: () => platform == null || platform === 'darwin' });
   const modelWait = { check: null, download: null };
   // What Voice sets up when turned on (voice-setup.js), painted on the mic and in a panel beside it.
   const setupSteps = createSetupSteps({ onChange: () => paint() });
@@ -183,6 +187,7 @@ export function initBoardVoice({ send, getSetting, setSetting, toast = () => {},
   }
   function typingInto() {
     const box = voiceBox?.active, last = voiceBox?.last;
+    if (box?.local) return 'A text box has focus: what you say goes into it, heard in this browser by Vosk’s model';
     if (box?.state === 'dictation') return `A text box has focus: macOS Dictation types into it, since Apple’s speech helper can’t run here${voiceBox.helperDown ? ` (${voiceBox.helperDown.error})` : ''}`;
     return `A text box has focus: what you say goes into it, heard on this Mac by Apple’s speech helper${last ? `. Last time: first words ${fmt(last.first)} after starting, final text ${fmt(last.afterStop)} after stopping` : ''}`;
   }
@@ -242,12 +247,15 @@ export function initBoardVoice({ send, getSetting, setSetting, toast = () => {},
   const checkModel = () => { setupSteps.set('vosk', 'active', { note: 'checking' }); return modelAsked('check'); };
   // The words said after the escape word reached only the box's recording, never Vosk: each presses
   // here as if Vosk had heard it, while the board is in front, as the labels would.
+  const prepare = () => prepareModel({ check: checkModel, ask: askModel, download: downloadModel }).then(() => setupSteps.set('vosk', 'active', { note: 'loading', fraction: 0.9 }), (err) => { setupSteps.set('vosk', 'failed', { note: err.message }); throw err; });
+  // Off a Mac a box records with the labels' model, in the browser (loadModel hands back the one loaded).
+  const local = createLocalSpeech({ mic: shared, model: () => loadModel(MODEL_URL, prepare) });
   const afterEscape = (words) => { if (doc.visibilityState === 'visible' && doc.hasFocus()) for (const w of words) hear(w); };
-  voiceBox = createVoiceBox({ doc, speech, dictation, escapeWord: () => escapeWordOf(settings()), onExit: (el, words) => { el?.blur(); afterEscape(words); }, onAfter: afterEscape, onChange: () => paint() });
+  voiceBox = createVoiceBox({ doc, speech, local, dictation, escapeWord: () => escapeWordOf(settings()), onExit: (el, words) => { el?.blur(); afterEscape(words); }, onAfter: afterEscape, onChange: () => paint() });
   voice = createVoice({
     win,
     mic: shared,
-    prepare: () => prepareModel({ check: checkModel, ask: askModel, download: downloadModel }).then(() => setupSteps.set('vosk', 'active', { note: 'loading', fraction: 0.9 }), (err) => { setupSteps.set('vosk', 'failed', { note: err.message }); throw err; }),
+    prepare,
     // The rest once the labels' model has loaded: the helper and macOS's model, once a page unless it
     // failed for a while only. A helper that cannot run sends the boxes to Dictation, labels or not.
     setup: () => {
@@ -304,6 +312,7 @@ export function initBoardVoice({ send, getSetting, setSetting, toast = () => {},
         const asked = modelWait[msg.op];
         if (!asked) return true;
         modelWait[msg.op] = null;
+        if (msg.op === 'check' && typeof msg.platform === 'string') { platform = msg.platform; if (platform !== 'darwin') skipApple(setupSteps); }
         if (msg.op === 'check') asked.resolve(!!msg.present); else if (msg.ok) asked.resolve(); else asked.reject(new Error(msg.error));
         return true;
       }

@@ -41,3 +41,16 @@ test('the helper’s setup goes over the socket under its own id and settles on 
   assert.deepEqual(await down, { reason: 'no-swiftc', error: 'swiftc is not installed' });
   assert.deepEqual(steps.steps.slice(1).map((s) => s.state), ['failed', 'skipped'], 'no helper: the boxes use Dictation');
 });
+
+test('off a Mac the server says not-mac at once: both Apple steps are skipped, not failed, and the labels go ahead', async () => {
+  const sent = [], steps = createSetupSteps();
+  const h = createHelperSetup({ send: (m) => sent.push(m), steps, tag: 'b' });
+  steps.set('vosk', 'done');
+  const run = h.run();
+  h.take({ id: 'b-setup-1', kind: 'error', step: 'helper', reason: 'not-mac', error: 'Apple’s speech helper only runs on a Mac' });
+  assert.deepEqual(await run, { reason: 'not-mac', error: 'Apple’s speech helper only runs on a Mac' });
+  assert.deepEqual(steps.steps.map((s) => s.state), ['done', 'skipped', 'skipped']);
+  assert.equal(steps.done, true, 'nothing holds the labels back');
+  assert.match(setupHtml(steps.steps, true), /Voice is ready.*only on a Mac.*Vosk’s model in the browser/s);
+  assert.doesNotMatch(setupHtml(steps.steps, true), /Dictation/, 'Dictation is not offered off a Mac');
+});

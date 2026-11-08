@@ -86,9 +86,9 @@ test('a cache that does not hash to the pin is never put back, so Voice asks to 
   fs.mkdirSync(s.cacheDir);
   fs.writeFileSync(s.kept, 'the tampered one');
   const sent = [];
-  await makeVoiceModelHandler({ has: () => hasVoiceModel({ dir: s.dir, cacheDir: s.cacheDir, model: pin }) })
+  await makeVoiceModelHandler({ platform: 'linux', has: () => hasVoiceModel({ dir: s.dir, cacheDir: s.cacheDir, model: pin }) })
     .handler({}, { broadcast: (m) => sent.push(m), log() {} });
-  assert.deepEqual(sent, [{ event: 'voice-model', op: 'check', present: false }], 'the board is told to show its Download warning');
+  assert.deepEqual(sent, [{ event: 'voice-model', op: 'check', present: false, platform: 'linux' }], 'the board is told to show its Download warning');
   assert.equal(fs.existsSync(s.file), false, 'nothing restored into public/');
   assert.deepEqual(s.left(), [pin.file], 'no part file left');
   await ensureVoiceModel({ dir: s.dir, cacheDir: s.cacheDir, model: pin, fetchImpl: s.serve(good) });
