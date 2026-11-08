@@ -63,6 +63,8 @@ import { usageHandler } from './usage.js';
 import { searchHandler, searchStatusHandler, searchReindexHandler } from './search.js';
 import { adoptConversationHandler } from './adopt.js';
 import { getExtensions } from '../../extensions/index.js';
+// Voice (fork-only): see server/voice-handlers.js.
+import { VOICE_HANDLERS } from '../../voice-handlers.js';
 
 // The control-WS handler registry, mirroring server/mcp/tools. Adding a message
 // type = adding a module here. Each handler: { type, handler(msg, ctx) }, where
@@ -150,5 +152,5 @@ export const CONTROL_HANDLERS = [
 // injectable so tests never touch the loader's memo; the loader has already
 // refused any type that collides with a core one.
 export function activeHandlers({ ext = getExtensions() } = {}) {
-  return [...CONTROL_HANDLERS, ...ext.handlers];
+  return [...CONTROL_HANDLERS, ...VOICE_HANDLERS, ...ext.handlers];
 }

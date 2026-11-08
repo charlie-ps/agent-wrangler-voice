@@ -38,6 +38,9 @@ test('each registered setting appears in exactly one tab', () => {
     'flipNavHotkeys',
     'autoUpdate',
     'refreshSessionsAfterUpdate',
+    // Voice (fork-only): voice-settings.js.
+    'labels',
+    'escapeWord',
   ]));
 });
 

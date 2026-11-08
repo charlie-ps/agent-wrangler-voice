@@ -1,0 +1,24 @@
+Agent Wrangler with Voice — a personal fork of Agent Wrangler
+(https://github.com/PortSwigger/agent-wrangler), Copyright PortSwigger Ltd, licensed under the Apache
+License, Version 2.0 (see LICENSE). Everything outside the files listed below is upstream's, merged in
+unchanged.
+
+Voice on the board is ported from Wrangler², an Agent Wrangler extension, Copyright 2026 Charlie
+Goldstraw, licensed under the Apache License, Version 2.0: public/job-keys.js, public/job-voice.js,
+public/label-modes.js, public/voice-model.js, public/voice-mic.js, public/voice-worklet.js,
+public/voice-consent.js, public/voice-open.js, public/voice-setup.js, public/voice-speech.js,
+public/voice-box.js, public/dictation.js, public/press-sig.js, server/voice-model.js,
+server/speech.js, server/speech-helper.swift, server/dictation.js and their tests, copied and adapted
+to Agent Wrangler's own board (public/board-voice.js, public/voice-settings.js, public/voice.css,
+server/voice-handlers.js).
+
+Voice includes or uses the following, each licensed under the Apache License, Version 2.0:
+
+- vosk-browser 0.0.8 (https://github.com/ccoreilly/vosk-browser), Copyright Ciaran O'Reilly: its npm
+  dist/vosk.js, unchanged, as public/vendor/vosk-browser.js.
+- Vosk (https://github.com/alphacep/vosk-api), Copyright Alpha Cephei Inc., and Kaldi
+  (https://github.com/kaldi-asr/kaldi), Copyright the Kaldi authors: the speech recognizer
+  vosk-browser compiles to WebAssembly and embeds.
+- The vosk-model-small-en-us-0.15 model (https://alphacephei.com/vosk/models), Copyright Alpha Cephei
+  Inc.: not distributed here; the board's server downloads it only when you choose Download in Voice's
+  warning (server/voice-model.js), and keeps it only if it hashes to the pin in public/voice-model.js.

@@ -1,5 +1,16 @@
 # Agent Wrangler
 
+> [!NOTE]
+> **This is a personal fork: Agent Wrangler with Voice.** It adds
+> Wrangler²'s Voice (an Agent Wrangler extension by Charlie Goldstraw) to the whole board: under
+> Settings › Shortcuts › Labels › Voice every button, tab, session card and dialog carries a word
+> badge, saying the word presses it, "up" and "down" scroll, and speaking into a focused text box types
+> at the cursor. Everything is heard on your own Mac. See [VOICE.md](VOICE.md) for what it does and
+> what it downloads, [NOTICE](NOTICE) for attribution and [SECURITY-NOTES.md](SECURITY-NOTES.md) for
+> its accepted risks. Upstream's `main` is merged in daily with a merge commit
+> (`.github/workflows/upstream-sync.yml`); this fork never sends anything upstream. Everything below is
+> upstream's README.
+
 Agent Wrangler is the command center and control plane for every Claude Code and OpenAI Codex
 session you run — one board to dispatch, monitor, and step straight into any session's live terminal.
 It's also the channel agents use to coordinate with each other: spawning other agents and whole

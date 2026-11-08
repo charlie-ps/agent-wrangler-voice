@@ -70,7 +70,9 @@ import { openDiffPanel, toggleDiffPanel, closeDiffPanel, isDiffPanelOpen, diffPa
 import { openUsagePanel, onUsage } from './usage.js';
 import { initSearchView, onEnterSearchView, onSearchResults, onSearchStatus, onAdopted, onAdoptFailed, clearSearch, refreshSearchTaskFilter } from './search.js';
 import { CODEX_POLICY_FALLBACK, syncCodexPolicyControls, fillCodexPolicyControls, readCodexPolicyControls } from './codex-policy-field.js';
-import { initSettings, flashSettingsSaved, getSetting, setExtensionDefs, setRuntimeOptions, EXT_SETTING_PREFIX, openSettings, refreshThemeRows } from './settings.js';
+import { initSettings, flashSettingsSaved, getSetting, setExtensionDefs, setRuntimeOptions, EXT_SETTING_PREFIX, openSettings, refreshThemeRows, setSetting } from './settings.js';
+// Voice (fork-only, ported from Wrangler²): the whole integration lives in board-voice.js.
+import { initBoardVoice } from './board-voice.js';
 import { sidebarWidthFromDrag, gridWidthFromSidebarDrag } from './sidebar-side.js';
 import { initChatView } from './chat-view.js';
 import { createTerminalImagePaste } from './terminal-image-paste.js';
@@ -7245,6 +7247,7 @@ initSettings({
   // on its own, so they have to be applied on the flip itself.
   onChange: (id, value) => {
     if (id === 'terminalSide') applyTerminalSide(value);
+    boardVoice?.settingChanged(id);
   },
   appearance: {
     themeRowsHtml: renderThemeRows,
@@ -7257,6 +7260,7 @@ initSettings({
   extensions: { mount: openExtensionsPanel },
   updates: { mount: mountUpdatePanel },
 });
+const boardVoice = initBoardVoice({ send, getSetting, setSetting, toast });
 document.getElementById('m-cancel').addEventListener('click', cancelModal);
 document.getElementById('m-go').addEventListener('click', () => submitDispatch());
 [1, 2, 3].forEach((n) =>
@@ -7516,6 +7520,7 @@ function connect() {
   ws.onclose = () => { chatView.onConnectionClosed(); setTimeout(connect, 1500); };
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
+    if (boardVoice.take(msg)) return;
     if (msg.type === 'graph') { applyGraph(msg.graph); armIdleReapply(); }
     // A `config` is the first frame of every connect, so it is also how the board
     // learns a restart finished: the pending install/removal notes describe a
