@@ -832,3 +832,17 @@ test('End is aimed again once it lands, so plates that grew as the scroll reache
   el.dispatchEvent(new window.Event('scrollend'));
   assert.equal(el.scrollTop, 2660, 'a line, or the end already reached, leaves nothing waiting to snap it back');
 });
+
+test('a target keeps its very own word before a twin’s, though the words were drawn in another order than rank', () => {
+  // Every tile's New session (rank 1) and ⋯ (rank 3) are twins to `same`, drawn interleaved, ranked apart.
+  const drawnOrder = ['new1', 'more1', 'new2', 'more2', 'new3', 'more3'];
+  const hints = ['new1', 'new2', 'new3', 'more1', 'more2', 'more3'].map((el) => ({ el }));
+  const same = () => true, wordOf = () => '';
+  let words = wordLabels(hints, [], { same, wordOf });
+  const first = Object.fromEntries(hints.map((h) => [h.el, words.get(h)]));
+  for (let i = 0; i < 5; i++) {
+    const before = drawnOrder.map((el) => ({ el, label: words.get(hints.find((h) => h.el === el)) }));
+    words = wordLabels(hints, before, { same, wordOf });
+    assert.deepEqual(Object.fromEntries(hints.map((h) => [h.el, words.get(h)])), first, `sync ${i + 2}`);
+  }
+});

@@ -27,6 +27,7 @@
 // Never the browser's Web Speech API, which sends audio away.
 import { createKeys, clickables, reach, bareKey, typing, dictatable, hintRank, COMMANDS, scrollStep } from './job-keys.js';
 import { labelsOf } from './label-modes.js';
+import { pressSig } from './press-sig.js';
 import { createVoice, loadModel, MODEL_URL } from './job-voice.js';
 import { createModelAsk, prepareModel, modelSize, DECLINED } from './voice-consent.js';
 import { createVoiceBox, escapeWordOf, fmt, sameBox } from './voice-box.js';
@@ -57,6 +58,13 @@ export function identity(el) {
   if (el?.matches?.('.session-card, .worker-row:not(.team-row)') && el.dataset.sid) return `s:${el.dataset.sid}`;
   if (el?.matches?.('.team-row') && el.dataset.leadSid) return `team:${el.dataset.leadSid}`;
   if (el?.matches?.('.subagent-row') && el.dataset.subagentId) return `sa:${el.dataset.ownerSid}/${el.dataset.subagentId}`;
+  // A task tile's buttons (New session, ⋯) carry no id, data or text, so every tile's look alike: its
+  // task, the session card holding it if any, and its class tell them apart.
+  const tile = el?.closest?.('.task-cell');
+  if (tile) {
+    const sid = el.closest('[data-sid]')?.dataset.sid;
+    return `t:${tile.dataset.taskid ?? tile.dataset.entity ?? ''}${sid ? `/${sid}` : ''}|${el.classList[0] || ''}|${pressSig(el)}|${el.textContent.trim()}`;
+  }
   return null;
 }
 // What scrolls in `root`: itself, else the tallest scroller showing inside it.

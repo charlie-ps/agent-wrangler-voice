@@ -122,8 +122,14 @@ export function targetWord(el, vocab = BUTTON_WORDS) {
 export function wordLabels(hints, before = [], { words = WORDS, own = BUTTON_WORDS, same = (a, b) => sameTarget(a, b), wordOf = (el) => targetWord(el, own) } = {}) {
   const taken = new Set(), out = new Map(), had = before.filter((b) => words.includes(b.label) || own.includes(b.label));
   const give = (h, w) => { out.set(h, w); taken.add(w); };
+  // The very element first, then a twin drawn again: `before` is in the order drawn and `hints` in
+  // rank, so a twin first would hand look-alikes (every tile's ⋯) each other's words at every sync.
   for (const h of hints) {
-    const was = had.find((b) => !taken.has(b.label) && same(b.el, h.el));
+    const was = had.find((b) => b.el === h.el && !taken.has(b.label));
+    if (was) give(h, was.label);
+  }
+  for (const h of hints) {
+    const was = out.has(h) ? null : had.find((b) => !taken.has(b.label) && same(b.el, h.el));
     if (was) give(h, was.label);
   }
   for (const h of hints) {

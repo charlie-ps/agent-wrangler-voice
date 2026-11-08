@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 import { initBoardVoice, identity, OUT_TYPES, JOBS_VIEW } from './board-voice.js';
+import { createKeys, clickables, hintRank } from './job-keys.js';
 
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 function board(t, { labels = 'off', open = true, jobs = false } = {}) {
@@ -100,4 +101,67 @@ test('while the Jobs view is in front its own Voice has the mic: this one stays 
 
 test('Wrangler²’s control messages go out under this board’s own voice: types', () => {
   assert.deepEqual(OUT_TYPES, { 'voice-model': 'voice:model', speech: 'voice:speech', dictation: 'voice:dictation', 'job-open-url': 'voice:open-url' });
+});
+
+// Agent Wrangler's task tiles as cards.js draws them: each head's New session and ⋯ carry no id, data or text.
+const tileHtml = (id, name) => `<div class="task-cell" data-taskid="${id}"><div class="task-head"><span class="task-name">${name}</span>
+  <button class="task-new-sess" title="New session in this task"><svg></svg></button><button class="task-actions-btn" title="Task actions"><svg></svg></button></div>
+  <div class="task-body"><div class="session-card" role="button" data-sid="${id}-s">working</div></div></div>`;
+const TILES = ['t1', 't2', 't3', 't4'];
+function tiles(t, { voice = true } = {}) {
+  const w = new Window({ url: 'http://localhost/' });
+  t.after(() => w.happyDOM.abort().then(() => w.close()));
+  w.document.body.innerHTML = `<div id="grid">${TILES.map((id) => tileHtml(id, id.toUpperCase())).join('')}<div class="task-cell no-task" data-entity="no-task"><div class="task-head"><button class="task-new-sess"></button><button class="task-actions-btn"></button></div></div></div>`;
+  const grid = w.document.getElementById('grid');
+  const box = { top: 10, left: 10, bottom: 50, right: 210 };
+  const keys = createKeys({ doc: w.document, rectOf: () => box, hintRectOf: () => box, voice: () => voice, identity,
+    targets: () => ({ host: grid, items: clickables(grid).map((el) => ({ hint: true, el, rank: hintRank(el), act: () => {} })) }) });
+  t.after(() => keys.dispose());
+  // Each button's badge, named by its tile and class, so a redraw's new elements read the same.
+  const badges = () => Object.fromEntries(keys.drawn().map((d) => [`${d.el.closest('.task-cell').dataset.taskid ?? 'none'} ${d.el.className}`, d.label]));
+  return { w, grid, keys, badges };
+}
+
+test('a task tile’s buttons are told apart by their task and class, look alike as they do', () => {
+  const w = new Window();
+  w.document.body.innerHTML = tileHtml('a', 'A') + tileHtml('b', 'B') + '<div class="task-cell" data-entity="no-task"><button class="task-new-sess"></button></div>';
+  const ids = [...w.document.querySelectorAll('.task-new-sess, .task-actions-btn, .session-card')].map(identity);
+  assert.equal(new Set(ids).size, ids.length, 'no two alike');
+  assert.equal(ids.at(-1).startsWith('t:no-task|task-new-sess|'), true, 'the Unassigned tile is a task of its own');
+  assert.equal(ids[2], 's:a-s', 'a session card keeps its own id');
+  w.close();
+});
+
+test('under Voice, repeated syncs over several tasks’ New session and ⋯ keep every word where it was', (t) => {
+  const v = tiles(t);
+  v.keys.sync();
+  const first = v.badges();
+  assert.equal(Object.keys(first).length, TILES.length * 3 + 2, 'every button and card has a word');
+  assert.equal(new Set(Object.values(first)).size, Object.keys(first).length, 'no word twice');
+  // A session updating (its card's text) re-syncs the board, many times over.
+  for (let i = 0; i < 6; i++) {
+    for (const c of v.grid.querySelectorAll('.session-card')) c.textContent = `idle ${i}m`;
+    v.keys.sync();
+    assert.deepEqual(v.badges(), first, `sync ${i + 2} moved no word`);
+  }
+});
+
+test('under Voice, redrawing a task tile leaves its buttons’ words where they were', (t) => {
+  const v = tiles(t);
+  v.keys.sync();
+  const first = v.badges();
+  // One tile drawn again (its session changed), then the whole board.
+  v.grid.querySelector('[data-taskid="t2"]').outerHTML = tileHtml('t2', 'T2');
+  v.keys.sync();
+  assert.deepEqual(v.badges(), first, 'one tile redrawn');
+  v.grid.innerHTML = v.grid.innerHTML;
+  v.keys.sync();
+  assert.deepEqual(v.badges(), first, 'the whole board redrawn');
+});
+
+test('on Keyboard, a redrawn board hands every task button its own letter back', (t) => {
+  const v = tiles(t, { voice: false });
+  v.keys.sync();
+  const first = v.badges();
+  for (let i = 0; i < 3; i++) { v.grid.innerHTML = v.grid.innerHTML; v.keys.sync(); assert.deepEqual(v.badges(), first, `redraw ${i + 1}`); }
 });
