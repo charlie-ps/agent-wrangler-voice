@@ -1,0 +1,56 @@
+/* Voice on the board (board-voice.js), ported from Wrangler²'s jobs.css. Loaded by board-voice.js. */
+
+/* The badges (job-keys.js), in a layer of their own (under :root, so Wrangler²'s own .job-key rules, loaded
+   with its extension, never outrank these on the board): placed against the layer's box from the targets'
+   rects, inside the box the target scrolls in (.job-keys-in) so a scroll carries them, else fixed over
+   the window. The colours are the hint jump's (.hint-marker). */
+:root .job-keys { position:fixed; inset:0; z-index:300; pointer-events:none; }
+:root .job-keys-in { position:absolute; inset:0 auto auto 0; width:0; height:0; z-index:5; }
+:root .job-key { position:absolute; min-width:24px; box-sizing:border-box; padding:0 6px; border-radius:4px; background:var(--hint, #f2cc60); color:var(--hint-fg, #1c1400); border:1px solid var(--hint-border, #9a6700); font:700 16px/24px var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); letter-spacing:1.5px; text-transform:uppercase; text-align:center; white-space:nowrap; box-shadow:0 2px 6px var(--shadow, rgba(0,0,0,.35)); }
+:root .job-key[hidden] { display:none; }
+/* Voice's words are read, not hunted for: small, quiet and lowercase, so a board full of them stays calm. */
+:root .job-key.job-key-word { min-width:0; padding:0 4px; border-radius:3px; font:500 11px/15px system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing:0; text-transform:none; box-shadow:0 1px 3px var(--shadow, rgba(0,0,0,.3)); }
+:root .job-key-typed { color:color-mix(in srgb, var(--hint-fg, #1c1400) 35%, transparent); }
+
+/* The rail's mic: quiet while Voice is off, red while it is on. */
+#nav-rail button.voice-mic { position:relative; }
+#nav-rail button.voice-mic:not([data-voice="off"]) { color:var(--red-fg, #f85149); background:color-mix(in srgb, var(--red-fg, #f85149) 16%, transparent); box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--red-fg, #f85149) 70%, transparent); }
+.voice-mic[data-voice="listening"] svg { animation:voice-live 1.6s ease-in-out infinite alternate; }
+.voice-mic:is([data-voice="waiting"], [data-voice="paused"], [data-voice="dictating"], [data-voice="declined"], [data-voice="yielded"]) { opacity:.6; }
+/* Setting up: the share done goes round the mic (--voice-setup, 0 to 1). */
+.voice-mic[data-voice="loading"] svg { opacity:.6; }
+.voice-mic[data-voice="loading"]::after { content:""; position:absolute; inset:-3px; border-radius:50%; background:conic-gradient(var(--red-fg, #f85149) calc(var(--voice-setup, 0) * 360deg), color-mix(in srgb, var(--red-fg, #f85149) 22%, transparent) 0); -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px)); mask:radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px)); pointer-events:none; }
+@keyframes voice-live { to { opacity:.55; } }
+@media (prefers-reduced-motion: reduce) { .voice-mic svg, .voice-setup li .voice-setup-mark { animation:none !important; } }
+
+.voice-setup { position:fixed; z-index:400; box-sizing:border-box; width:min(340px, calc(100vw - 16px)); padding:10px 13px 11px; border-radius:12px; border:1px solid var(--border); background:var(--surface); color:var(--fg); box-shadow:0 10px 28px -12px var(--shadow); font:12.5px/1.4 var(--font); }
+.voice-setup[hidden] { display:none; }
+.voice-setup b { font-weight:600; }
+.voice-setup ol { margin:7px 0 0; padding:0; list-style:none; display:grid; gap:6px; }
+.voice-setup li { display:grid; grid-template-columns:16px 1fr; gap:6px; color:var(--fg-muted); }
+.voice-setup li:is([data-state="active"], [data-state="done"]) { color:var(--fg); }
+.voice-setup li small { display:block; color:var(--fg-muted); font-size:11.5px; overflow-wrap:anywhere; }
+.voice-setup-mark { text-align:center; }
+.voice-setup li[data-state="done"] .voice-setup-mark { color:var(--green-fg, #3fb950); }
+.voice-setup li[data-state="failed"] .voice-setup-mark { color:var(--red-fg, #f85149); }
+.voice-setup li[data-state="active"] .voice-setup-mark { color:var(--red-fg, #f85149); animation:voice-live .8s ease-in-out infinite alternate; }
+.voice-setup p { margin:7px 0 0; color:var(--fg-muted); font-size:11.5px; }
+
+/* voice-box.js: the status line above the text box recording under Voice. */
+.voice-hud { position:fixed; z-index:400; box-sizing:border-box; padding:6px 11px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--fg); box-shadow:0 8px 24px -10px var(--shadow); font:12.5px/1.4 var(--font); pointer-events:none; }
+.voice-hud[hidden] { display:none; }
+.voice-hud[data-tone="live"]::before { content:""; display:inline-block; width:8px; height:8px; margin-right:7px; border-radius:50%; background:var(--red-fg, #f85149); vertical-align:1px; }
+.voice-hud[data-tone="warn"] { border-color:color-mix(in srgb, var(--snooze-fg, #d29922) 50%, var(--border)); }
+.voice-hud[data-tone="bad"] { border-color:color-mix(in srgb, var(--red-fg, #f85149) 60%, var(--border)); color:var(--red-fg, #f85149); }
+
+/* voice-consent.js: the warning before the model is fetched. */
+.job-dialog.job-voice-ask { width:min(460px,calc(100vw - 32px)); height:fit-content; padding:22px 24px; border-radius:12px; border:1px solid var(--border); background:var(--surface); color:var(--fg); box-shadow:0 24px 60px -20px var(--shadow); font:13px/1.45 var(--font); }
+.job-voice-ask::backdrop { background:rgba(0,0,0,.45); }
+.job-voice-ask h2 { margin:0; font-size:18px; font-weight:600; }
+.job-voice-ask-why { margin:6px 0 0; font-size:12.5px; line-height:1.5; color:var(--fg-muted); }
+.job-voice-ask-why b { color:var(--fg); font-weight:600; }
+.job-voice-ask-also { margin:10px 0 0; font-size:12.5px; line-height:1.5; color:var(--fg-muted); }
+.job-voice-ask-from { margin:8px 0 0; font:11px/1.4 var(--font-mono, ui-monospace, monospace); color:var(--fg-muted); overflow-wrap:anywhere; }
+.job-voice-ask .job-actions { margin-top:16px; display:flex; gap:8px; }
+.job-voice-ask .job-actions button { padding:6px 14px; border-radius:6px; border:1px solid var(--border); background:var(--surface-2); color:var(--fg); font:inherit; cursor:pointer; }
+.job-voice-ask .job-actions button.primary { background:var(--blue, #2f81f7); border-color:var(--blue, #2f81f7); color:#fff; }

@@ -29,3 +29,6 @@ docs/*
 .beads/proxieddb/
 
 !.claude/skills/evaluate-model/
+
+# Voice (fork-only): the pinned model, downloaded on the human's Download (server/voice-model.js)
+public/voice-model/

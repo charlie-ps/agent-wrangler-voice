@@ -1,0 +1,44 @@
+# Fork-only: keeps this Voice fork level with upstream Agent Wrangler. Once a day (or by hand) it
+# merges upstream's main into the fork's main with a merge commit and pushes only to origin, the fork;
+# a merge that would conflict opens a pull request on the fork instead (scripts/upstream-sync.sh).
+# It never pushes, and opens nothing, upstream.
+#
+# GITHUB_TOKEN may not push a commit that changes a file under .github/workflows/, which an upstream
+# merge sometimes does: set a SYNC_TOKEN secret (a fine-grained token on this fork only, with Contents,
+# Pull requests and Workflows read/write) and the job uses it instead.
+name: Upstream sync
+
+on:
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    # Only ever on the fork: a copy of this file anywhere else does nothing.
+    if: github.repository == 'charlie-ps/agent-wrangler-voice'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.SYNC_TOKEN || github.token }}
+
+      - name: Merge upstream main
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
+          UPSTREAM_URL: https://github.com/PortSwigger/agent-wrangler.git
+          REPO: ${{ github.repository }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          bash scripts/upstream-sync.sh

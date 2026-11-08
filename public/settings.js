@@ -31,6 +31,7 @@
 import { esc, anyModalOpen } from './util.js';
 import { shortcutsHtml } from './shortcuts.js';
 import { keybindings } from './keybindings.js';
+import { VOICE_SETTINGS, VOICE_SETTING_IDS } from './voice-settings.js';
 
 const STORE_PREFIX = 'cm-setting-';
 
@@ -197,6 +198,7 @@ export const SETTINGS = [
     help: 'Running sessions keep the MCP tools and skills they launched with. When this is on, sessions launched before the latest update restart one at a time after 10 idle minutes with no terminal, background job or snooze. Each restart re-reads the conversation, so the next turn pays for a new prompt cache.',
     default: false,
   },
+  ...VOICE_SETTINGS,
 ];
 
 // The Extensions tab's rows are not hand-listed: setExtensionDefs builds one
@@ -219,7 +221,7 @@ export const SETTINGS_TABS = [
     settingIds: ['autoFixPrChecksDefault', 'prModelFooter', 'trustCodexLaunchCwd', 'trustClaudeLaunchCwd', 'archiveReviewEnabled', 'mailWakesDormant'],
   },
   { id: 'extensions', label: 'Extensions', settingIds: [] },
-  { id: 'shortcuts', label: 'Shortcuts', settingIds: ['flipNavHotkeys'] },
+  { id: 'shortcuts', label: 'Shortcuts', settingIds: ['flipNavHotkeys', ...VOICE_SETTING_IDS] },
   { id: 'updates', label: 'Updates', settingIds: ['autoUpdate', 'refreshSessionsAfterUpdate'] },
 ];
 
